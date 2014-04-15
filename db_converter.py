@@ -128,8 +128,7 @@ def parse(input_filename, output_filename):
                 elif type == "tinytext":
                     type = "text"
                 elif type.startswith("varchar("):
-                    size = int(type.split("(")[1].rstrip(")"))
-                    type = "varchar(%s)" % (size * 2)
+                    type = "text"
                 elif type == "datetime":
                     type = "timestamp with time zone"
                 elif type == "double":
