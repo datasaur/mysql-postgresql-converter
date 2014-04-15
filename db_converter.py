@@ -133,7 +133,7 @@ def parse(input_filename, output_filename):
                     type = "timestamp with time zone"
                 elif type == "double":
                     type = "double precision"
-                elif type == "blob":
+                elif type.endswith("blob"):
                     type = "bytea"
                 elif type.startswith("enum(") or type.startswith("set("):
                     types_str = type.split("(")[1].rstrip(")").rstrip('"')
