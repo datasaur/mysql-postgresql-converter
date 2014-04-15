@@ -1,11 +1,9 @@
 #!/usr/bin/env python
 
 """
-Fixes a MySQL dump made with the right format so it can be directly
-imported to a new PostgreSQL database.
+Fixes a MySQL dump made with the right format so it can be directly imported to a new PostgreSQL database.
 
-Dump using:
-mysqldump --compatible=postgresql --default-character-set=utf8 -r databasename.mysql -u root databasename
+Dump using: mysqldump --compatible=postgresql --default-character-set=utf8 -r databasename.mysql -u root databasename
 """
 
 import re
@@ -69,7 +67,7 @@ def parse(input_filename, output_filename):
             secs_left % 60,
         ))
         logging.flush()
-        line = line.decode("utf8").strip().replace(r"\\", "WUBWUBREALSLASHWUB").replace(r"\'", "''").replace("WUBWUBREALSLASHWUB", r"\\")
+        line = unicode(line, errors='replace').strip().replace(r"\\", "WUBWUBREALSLASHWUB").replace(r"\'", "''").replace("WUBWUBREALSLASHWUB", r"\\")
         # Ignore comment lines
         if line.startswith("--") or line.startswith("/*") or line.startswith("LOCK TABLES") or line.startswith("DROP TABLE") or line.startswith("UNLOCK TABLES") or not line:
             continue
@@ -110,10 +108,13 @@ def parse(input_filename, output_filename):
                 # See if it needs type conversion
                 final_type = None
                 set_sequence = None
-                if type == "tinyint(1)":
-                    type = "int4"
+                if type.startswith("tinyint("):
+                    type = "smallint"
                     set_sequence = True
                     final_type = "boolean"
+                elif type.startswith("smallint("):
+                    type = "smallint"
+                    set_sequence = True
                 elif type.startswith("int("):
                     type = "integer"
                     set_sequence = True
@@ -128,10 +129,7 @@ def parse(input_filename, output_filename):
                     type = "text"
                 elif type.startswith("varchar("):
                     size = int(type.split("(")[1].rstrip(")"))
-                    type = "varchar(%s)" % (size * 2)
-                elif type.startswith("smallint("):
-                    type = "int2"
-                    set_sequence = True
+                    type = "varchar(%s)" % (size)
                 elif type == "datetime":
                     type = "timestamp with time zone"
                 elif type == "double":
@@ -139,7 +137,6 @@ def parse(input_filename, output_filename):
                 elif type == "blob":
                     type = "bytea"
                 elif type.startswith("enum(") or type.startswith("set("):
-
                     types_str = type.split("(")[1].rstrip(")").rstrip('"')
                     types_arr = [type_str.strip('\'') for type_str in types_str.split(",")]
 
@@ -222,4 +219,9 @@ def parse(input_filename, output_filename):
 
 
 if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        print 'Usage: db_converter.py database.mysql database.psql'
+        print 'Dump using: mysqldump --compatible=postgresql --default-character-set=utf8 -r database.mysql -u root databasename\n'
+        sys.exit()
+
     parse(sys.argv[1], sys.argv[2])
