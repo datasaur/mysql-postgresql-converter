@@ -3,7 +3,9 @@ MySQL to PostgreSQL Converter
 
 Lanyrd's MySQL to PostgreSQL conversion script. Use with care.
 
-This script was designed for our specific database and column requirements - places indexes on all foreign keys
+This script was designed for Lanyrd's specific database and column requirements, and made a bit more generic here.
+
+Places indexes on all foreign keys
 
 How to use
 ----------

@@ -130,7 +130,7 @@ def parse(input_filename, output_filename):
                     type = "text"
                 elif type.startswith("varchar("):
                     size = int(type.split("(")[1].rstrip(")"))
-                    type = "varchar(%s)" % (size)
+                    type = "varchar(%s)" % (size * 2)
                 elif type == "datetime":
                     type = "timestamp with time zone"
                 elif type == "double":
