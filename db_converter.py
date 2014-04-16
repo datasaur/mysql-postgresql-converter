@@ -51,6 +51,7 @@ def parse(input_filename, output_filename):
     output.write("START TRANSACTION;\n")
     output.write("SET standard_conforming_strings=off;\n")
     output.write("SET escape_string_warning=off;\n")
+    output.write("SET CLIENT_ENCODING TO 'UTF8';\n")
     output.write("SET CONSTRAINTS ALL DEFERRED;\n\n")
 
     for i, line in enumerate(input_fh):
@@ -68,7 +69,7 @@ def parse(input_filename, output_filename):
         ))
         logging.flush()
 
-        line = line.decode("utf8", errors='replace').strip().replace(r"\\", "WUBWUBREALSLASHWUB").replace(r"\'", "''").replace("WUBWUBREALSLASHWUB", r"\\")
+        line = unicode(line, errors='replace').strip().replace(r"\\", "WUBWUBREALSLASHWUB").replace(r"\'", "''").replace("WUBWUBREALSLASHWUB", r"\\")
 
         # Ignore comment lines
         if line.startswith("--") or line.startswith("/*") or line.startswith("LOCK TABLES") or line.startswith("DROP TABLE") or line.startswith("UNLOCK TABLES") or not line:
@@ -83,7 +84,7 @@ def parse(input_filename, output_filename):
                 creation_lines = []
             # Inserting data into a table?
             elif line.startswith("INSERT INTO"):
-                output.write(line.encode("utf8").replace("'0000-00-00 00:00:00'", "'-infinity'") + "\n")
+                output.write(line.encode("utf8", 'replace').replace("'0000-00-00 00:00:00'", "'-infinity'") + "\n")
                 num_inserts += 1
             # ???
             else:
