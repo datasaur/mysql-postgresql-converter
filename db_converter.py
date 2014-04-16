@@ -13,7 +13,7 @@ import time
 import subprocess
 
 
-def parse(input_filename, output_filename):
+def parse(input_filename, output_filename, rollback):
     "Feed it a file, and it'll output a fixed one"
 
     # State storage
@@ -29,6 +29,7 @@ def parse(input_filename, output_filename):
     fulltext_key_lines = []
     sequence_lines = []
     cast_lines = []
+    column_comments = []
     num_inserts = 0
     started = time.time()
 
@@ -48,7 +49,7 @@ def parse(input_filename, output_filename):
 
 
     output.write("-- Converted by db_converter\n")
-    output.write("START TRANSACTION;\n")
+    if rollback: output.write("START TRANSACTION;\n")
     output.write("SET standard_conforming_strings=off;\n")
     output.write("SET escape_string_warning=off;\n")
     output.write("SET CLIENT_ENCODING TO 'UTF8';\n")
@@ -108,6 +109,11 @@ def parse(input_filename, output_filename):
                     extra = ""
                 extra = re.sub("CHARACTER SET [\w\d]+\s*", "", extra.replace("unsigned", ""))
                 extra = re.sub("COLLATE [\w\d]+\s*", "", extra.replace("unsigned", ""))
+
+		comment = re.search("COMMENT '.+'", extra)
+		if comment: 
+			column_comments.append(comment.group().replace("COMMENT ", "COMMENT ON COLUMN %s.%s IS " % (current_table, name)))
+		extra = re.sub("COMMENT '.+'", "", extra)
 
                 # See if it needs type conversion
                 final_type = None
@@ -192,8 +198,8 @@ def parse(input_filename, output_filename):
 
     # Finish file
     output.write("\n-- Post-data save --\n")
-    output.write("COMMIT;\n")
-    output.write("START TRANSACTION;\n")
+    if rollback: output.write("COMMIT;\n")
+    if rollback: output.write("START TRANSACTION;\n")
 
     # Write typecasts out
     output.write("\n-- Typecasts --\n")
@@ -210,6 +216,11 @@ def parse(input_filename, output_filename):
     for line in sequence_lines:
         output.write("%s;\n" % line)
 
+    # Write column comments out
+    output.write("\n-- Comments --\n")
+    for line in column_comments:
+        output.write("%s;\n" % line)
+
     # Write full-text indexkeyses out
     output.write("\n-- Full Text keys --\n")
     for line in fulltext_key_lines:
@@ -217,14 +228,17 @@ def parse(input_filename, output_filename):
 
     # Finish file
     output.write("\n")
-    output.write("COMMIT;\n")
+    if rollback: output.write("COMMIT;\n")
     print ""
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print 'Usage: db_converter.py database.mysql database.psql'
+    if len(sys.argv) < 3:
+        print 'Usage: db_converter.py database.mysql database.psql [rollback]'
         print 'Dump using: mysqldump --compatible=postgresql --default-character-set=utf8 -r database.mysql -u root databasename\n'
         sys.exit()
 
-    parse(sys.argv[1], sys.argv[2])
+    rollback = False
+    if len(sys.argv) > 3 and sys.argv[3] == 'rollback': rollback = True 
+
+    parse(sys.argv[1], sys.argv[2], rollback)
