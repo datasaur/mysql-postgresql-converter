@@ -121,7 +121,7 @@ def parse(input_filename, output_filename, rollback):
                 if type.startswith("tinyint("):
                     type = "smallint"
                     set_sequence = True
-                    final_type = "boolean"
+                    #final_type = "boolean"
                 elif type.startswith("smallint("):
                     type = "smallint"
                     set_sequence = True
