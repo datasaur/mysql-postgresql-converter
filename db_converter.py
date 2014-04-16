@@ -69,6 +69,7 @@ def parse(input_filename, output_filename):
         ))
         logging.flush()
 
+        #TODO: Some bytea inserts failing with UTF-8 conversion errors on 0x00 characters
         line = unicode(line, errors='replace').strip().replace(r"\\", "WUBWUBREALSLASHWUB").replace(r"\'", "''").replace("WUBWUBREALSLASHWUB", r"\\")
 
         # Ignore comment lines

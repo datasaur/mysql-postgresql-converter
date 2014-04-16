@@ -3,9 +3,9 @@ MySQL to PostgreSQL Converter
 
 Lanyrd's MySQL to PostgreSQL conversion script. Use with care.
 
-This script was designed for Lanyrd's specific database and column requirements, and made a bit more generic here.
+This script was designed for Lanyrd's specific database and column requirements, and made a bit more generic in this fork.
 
-Places indexes on all foreign keys
+Places indexes on all foreign keys. Some binary / blob data throws UTF-8 conversion errors on import (TODO).
 
 How to use
 ----------
