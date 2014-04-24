@@ -86,7 +86,7 @@ def parse(input_filename, output_filename, rollback):
                 creation_lines = []
             # Inserting data into a table?
             elif line.startswith("INSERT INTO"):
-                output.write(line.encode("utf8", 'replace').replace("'0000-00-00 00:00:00'", "'-infinity'") + "\n")
+                output.write(line.encode("utf8", 'replace').replace("'0000-00-00 00:00:00'", "'1900-01-01'") + "\n")
                 num_inserts += 1
             # ???
             else:
@@ -178,16 +178,15 @@ def parse(input_filename, output_filename, rollback):
             elif line.startswith("UNIQUE KEY"):
                 creation_lines.append("UNIQUE (%s)" % line.split("(")[1].split(")")[0])
             elif line.startswith("FULLTEXT KEY"):
-
                 fulltext_keys = " || ' ' || ".join( line.split('(')[-1].split(')')[0].replace('"', '').split(',') )
                 fulltext_key_lines.append("CREATE INDEX ON %s USING gin(to_tsvector('english', %s))" % (current_table, fulltext_keys))
-
             elif line.startswith("KEY"):
                 pass
             # Is it the end of the table?
             elif line == ");":
                 output.write("CREATE TABLE \"%s\" (\n" % current_table)
                 for i, line in enumerate(creation_lines):
+		    line = line.replace("DEFAULT '0000-00-00 00:00:00'", "DEFAULT '1900-01-01 00:00:00'")  #TODO - move this hack to its proper location
                     output.write("    %s%s\n" % (line, "," if i != (len(creation_lines) - 1) else ""))
                 output.write(');\n\n')
                 current_table = None
