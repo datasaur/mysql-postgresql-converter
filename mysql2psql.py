@@ -12,6 +12,7 @@ import os
 import time
 import subprocess
 
+#TODO: Order output to place DDL first and all INSERTs after; Option to split into two files?
 
 def parse(input_filename, output_filename, rollback):
     "Feed it a file, and it'll output a fixed one"
