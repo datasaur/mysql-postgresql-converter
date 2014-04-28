@@ -3,7 +3,7 @@
 """
 Fixes a MySQL dump made with the right format so it can be directly imported to a new PostgreSQL database.
 
-Dump using: mysqldump --compatible=postgresql --default-character-set=utf8 -r databasename.mysql -u root databasename
+Dump using: mysqldump --compatible=postgresql --skip-triggers --default-character-set=utf8 -r databasename.mysql -u root databasename
 """
 
 import re
@@ -48,7 +48,7 @@ def parse(input_filename, output_filename, rollback):
         input_fh = open(input_filename)
 
 
-    output.write("-- Converted by db_converter\n")
+    output.write("-- Converted by mysql2psql.py\n")
     if rollback: output.write("START TRANSACTION;\n")
     output.write("SET standard_conforming_strings=off;\n")
     output.write("SET escape_string_warning=off;\n")
@@ -81,7 +81,7 @@ def parse(input_filename, output_filename, rollback):
         if current_table is None:
             # Start of a table creation statement?
             if line.startswith("CREATE TABLE"):
-                current_table = line.split('"')[1]
+                current_table = line.split('"')[1].lower()  # mixed case object names are evil
                 tables[current_table] = {"columns": []}
                 creation_lines = []
             # Inserting data into a table?
@@ -97,6 +97,7 @@ def parse(input_filename, output_filename, rollback):
             # Is it a column?
             if line.startswith('"'):
                 useless, name, definition = line.strip(",").split('"',2)
+		name = name.lower()  # mixed case object names are evil
                 try:
                     type, extra = definition.strip().split(" ", 1)
 
@@ -233,8 +234,8 @@ def parse(input_filename, output_filename, rollback):
 
 if __name__ == "__main__":
     if len(sys.argv) < 3:
-        print 'Usage: db_converter.py database.mysql database.psql [rollback]'
-        print 'Dump using: mysqldump --compatible=postgresql --default-character-set=utf8 -r database.mysql -u root databasename\n'
+        print 'Usage: mysql2psql.py database.mysql database.psql [rollback]'
+        print 'Dump using: mysqldump --compatible=postgresql --skip-triggers --default-character-set=utf8 -r database.mysql -u root databasename\n'
         sys.exit()
 
     rollback = False
