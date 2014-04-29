@@ -75,13 +75,17 @@ def parse(input_filename, output_filename, rollback):
         line = unicode(line, errors='replace').strip().replace(r"\\", "WUBWUBREALSLASHWUB").replace(r"\'", "''").replace("WUBWUBREALSLASHWUB", r"\\")
 
         # Ignore comment lines
-        if line.startswith("--") or line.startswith("/*") or line.startswith("LOCK TABLES") or line.startswith("DROP TABLE") or line.startswith("UNLOCK TABLES") or not line:
+        if line.startswith("--") or line.startswith("/*") or line.startswith("LOCK TABLES") or line.startswith("UNLOCK TABLES") or not line:
             continue
 
         # Outside of anything handling
         if current_table is None:
+	    if line.startswith("DROP TABLE"):
+    	        name = line.split('"')[1].lower()
+	        line = 'DROP TABLE IF EXISTS "%s";' % name 
+		output.write(line.encode("utf8", 'replace') + "\n")
             # Start of a table creation statement?
-            if line.startswith("CREATE TABLE"):
+            elif line.startswith("CREATE TABLE"):
                 current_table = line.split('"')[1].lower()
                 tables[current_table] = {"columns": []}
                 creation_lines = []
