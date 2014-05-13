@@ -75,21 +75,28 @@ def parse(input_filename, output_filename, rollback):
         line = unicode(line, errors='replace').strip().replace(r"\\", "WUBWUBREALSLASHWUB").replace(r"\'", "''").replace("WUBWUBREALSLASHWUB", r"\\")
 
         # Ignore comment lines
-        if line.startswith("--") or line.startswith("/*") or line.startswith("LOCK TABLES") or line.startswith("DROP TABLE") or line.startswith("UNLOCK TABLES") or not line:
+        if line.startswith("--") or line.startswith("/*") or line.startswith("LOCK TABLES") or line.startswith("UNLOCK TABLES") or not line:
             continue
 
         # Outside of anything handling
         if current_table is None:
+	    if line.startswith("DROP TABLE"):
+    	        name = line.split('"')[1].lower()
+	        line = 'DROP TABLE IF EXISTS "%s";' % name 
+		output.write(line.encode("utf8", 'replace') + "\n")
             # Start of a table creation statement?
-            if line.startswith("CREATE TABLE"):
-                current_table = line.split('"')[1].lower()  # mixed case object names are evil
+            elif line.startswith("CREATE TABLE"):
+                current_table = line.split('"')[1].lower()
                 tables[current_table] = {"columns": []}
                 creation_lines = []
             # Inserting data into a table?
             elif line.startswith("INSERT INTO"):
-                output.write(line.encode("utf8", 'replace').replace("'0000-00-00 00:00:00'", "'1900-01-01'") + "\n")
+		table, values = line.split("VALUES")
+		table = table.split("INSERT INTO")[1].strip().lower()
+                values = values.replace("'0000-00-00 00:00:00'", "'1900-01-01'").strip()  # Replace invalid MySQL dates
+                line = "INSERT INTO %s VALUES %s" % (table, values)
+		output.write(line.encode("utf8", 'replace') + "\n")
                 num_inserts += 1
-            # ???
             else:
                 print "\n ! Unknown line in main body: %s" % line
 
@@ -98,7 +105,7 @@ def parse(input_filename, output_filename, rollback):
             # Is it a column?
             if line.startswith('"'):
                 useless, name, definition = line.strip(",").split('"',2)
-		name = name.lower()  # mixed case object names are evil
+		name = name.lower()
                 try:
                     type, extra = definition.strip().split(" ", 1)
 
@@ -174,14 +181,14 @@ def parse(input_filename, output_filename, rollback):
                 tables[current_table]['columns'].append((name, type, extra))
             # Is it a constraint or something?
             elif line.startswith("PRIMARY KEY"):
-                creation_lines.append(line.rstrip(","))
+		creation_lines.append("PRIMARY KEY %s" % line.rstrip(",").split("PRIMARY KEY")[1].strip().lower())
             elif line.startswith("CONSTRAINT"):
-                foreign_key_lines.append("ALTER TABLE \"%s\" ADD CONSTRAINT %s DEFERRABLE INITIALLY DEFERRED" % (current_table, line.split("CONSTRAINT")[1].strip().rstrip(",")))
-                foreign_key_lines.append("CREATE INDEX ON \"%s\" %s" % (current_table, line.split("FOREIGN KEY")[1].split("REFERENCES")[0].strip().rstrip(",")))
+                foreign_key_lines.append("ALTER TABLE \"%s\" ADD CONSTRAINT %s DEFERRABLE INITIALLY DEFERRED" % (current_table, line.split("CONSTRAINT")[1].strip().rstrip(",").lower()))
+                foreign_key_lines.append("CREATE INDEX ON \"%s\" %s" % (current_table, line.split("FOREIGN KEY")[1].split("REFERENCES")[0].strip().rstrip(",").lower()))
             elif line.startswith("UNIQUE KEY"):
-                creation_lines.append("UNIQUE (%s)" % line.split("(")[1].split(")")[0])
+                creation_lines.append("UNIQUE (%s)" % line.split("(")[1].split(")")[0].lower())
             elif line.startswith("FULLTEXT KEY"):
-                fulltext_keys = " || ' ' || ".join( line.split('(')[-1].split(')')[0].replace('"', '').split(',') )
+                fulltext_keys = " || ' ' || ".join( line.split('(')[-1].split(')')[0].replace('"', '').split(',').lower() )
                 fulltext_key_lines.append("CREATE INDEX ON %s USING gin(to_tsvector('english', %s))" % (current_table, fulltext_keys))
             elif line.startswith("KEY"):
                 pass
