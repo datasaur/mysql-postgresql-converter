@@ -10,7 +10,6 @@ import re
 import sys
 import os
 import time
-import subprocess
 
 #TODO: Order output to place DDL first and all INSERTs after; Option to split into two files?
 
@@ -21,7 +20,7 @@ def parse(input_filename, output_filename, rollback):
     if input_filename == "-":
         num_lines = -1
     else:
-        num_lines = int(subprocess.check_output(["wc", "-l", input_filename]).strip().split()[0])
+        num_lines = sum(1 for line in open(input_filename, 'r'))
     tables = {}
     current_table = None
     creation_lines = []
@@ -80,10 +79,10 @@ def parse(input_filename, output_filename, rollback):
 
         # Outside of anything handling
         if current_table is None:
-	    if line.startswith("DROP TABLE"):
-    	        name = line.split('"')[1].lower()
-	        line = 'DROP TABLE IF EXISTS "%s";' % name 
-		output.write(line.encode("utf8", 'replace') + "\n")
+            if line.startswith("DROP TABLE"):
+                name = line.split('"')[1].lower()
+                line = 'DROP TABLE IF EXISTS "%s";' % name 
+                output.write(line.encode("utf8", 'replace') + "\n")
             # Start of a table creation statement?
             elif line.startswith("CREATE TABLE"):
                 current_table = line.split('"')[1].lower()
@@ -91,11 +90,11 @@ def parse(input_filename, output_filename, rollback):
                 creation_lines = []
             # Inserting data into a table?
             elif line.startswith("INSERT INTO"):
-		table, values = line.split("VALUES")
-		table = table.split("INSERT INTO")[1].strip().lower()
+                table, values = line.split("VALUES")
+                table = table.split("INSERT INTO")[1].strip().lower()
                 values = values.replace("'0000-00-00 00:00:00'", "'1900-01-01'").strip()  # Replace invalid MySQL dates
                 line = "INSERT INTO %s VALUES %s" % (table, values)
-		output.write(line.encode("utf8", 'replace') + "\n")
+                output.write(line.encode("utf8", 'replace') + "\n")
                 num_inserts += 1
             else:
                 print "\n ! Unknown line in main body: %s" % line
@@ -105,7 +104,7 @@ def parse(input_filename, output_filename, rollback):
             # Is it a column?
             if line.startswith('"'):
                 useless, name, definition = line.strip(",").split('"',2)
-		name = name.lower()
+                name = name.lower()
                 try:
                     type, extra = definition.strip().split(" ", 1)
 
@@ -119,10 +118,10 @@ def parse(input_filename, output_filename, rollback):
                 extra = re.sub("CHARACTER SET [\w\d]+\s*", "", extra.replace("unsigned", ""))
                 extra = re.sub("COLLATE [\w\d]+\s*", "", extra.replace("unsigned", ""))
 
-		comment = re.search("COMMENT '.+'", extra)
-		if comment: 
-			column_comments.append(comment.group().replace("COMMENT ", "COMMENT ON COLUMN %s.%s IS " % (current_table, name)))
-		extra = re.sub("COMMENT '.+'", "", extra)
+                comment = re.search("COMMENT '.+'", extra)
+                if comment: 
+                    column_comments.append(comment.group().replace("COMMENT ", "COMMENT ON COLUMN %s.%s IS " % (current_table, name)))
+                    extra = re.sub("COMMENT '.+'", "", extra)
 
                 # See if it needs type conversion
                 final_type = None
@@ -181,7 +180,7 @@ def parse(input_filename, output_filename, rollback):
                 tables[current_table]['columns'].append((name, type, extra))
             # Is it a constraint or something?
             elif line.startswith("PRIMARY KEY"):
-		creation_lines.append("PRIMARY KEY %s" % line.rstrip(",").split("PRIMARY KEY")[1].strip().lower())
+                creation_lines.append("PRIMARY KEY %s" % line.rstrip(",").split("PRIMARY KEY")[1].strip().lower())
             elif line.startswith("CONSTRAINT"):
                 foreign_key_lines.append("ALTER TABLE \"%s\" ADD CONSTRAINT %s DEFERRABLE INITIALLY DEFERRED" % (current_table, line.split("CONSTRAINT")[1].strip().rstrip(",").lower()))
                 foreign_key_lines.append("CREATE INDEX ON \"%s\" %s" % (current_table, line.split("FOREIGN KEY")[1].split("REFERENCES")[0].strip().rstrip(",").lower()))
@@ -196,7 +195,7 @@ def parse(input_filename, output_filename, rollback):
             elif line == ");":
                 output.write("CREATE TABLE \"%s\" (\n" % current_table)
                 for i, line in enumerate(creation_lines):
-		    line = line.replace("DEFAULT '0000-00-00 00:00:00'", "DEFAULT '1900-01-01 00:00:00'")  #TODO - move this hack to its proper location
+                    line = line.replace("DEFAULT '0000-00-00 00:00:00'", "DEFAULT '1900-01-01 00:00:00'")  #TODO - move this hack to its proper location
                     output.write("    %s%s\n" % (line, "," if i != (len(creation_lines) - 1) else ""))
                 output.write(');\n\n')
                 current_table = None
