@@ -20,7 +20,6 @@ def parse(input_filename, output_filename, rollback):
         num_bytes = -1
     else:
         num_bytes = os.path.getsize(input_filename)
-        print num_bytes
     tables = {}
     current_table = None
     creation_lines = []
@@ -59,7 +58,7 @@ def parse(input_filename, output_filename, rollback):
     for i, line in enumerate(input_fh):
         time_taken = time.time() - started
         bytes += len(line)  # assuming line is utf8 encoded from dump options
-        percentage_done = bytes / float(num_bytes)
+        percentage_done = bytes / num_bytes
         secs_left = (time_taken / percentage_done) - time_taken
         logging.write("\rLine %i (%.2f%%) [%s tables] [%s inserts] [ETA: %i min %i sec]" % (
             i + 1,
