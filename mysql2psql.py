@@ -5,12 +5,12 @@ Fixes a MySQL dump made with the right format so it can be directly imported to 
 
 Dump using: mysqldump --compatible=postgresql --skip-triggers --default-character-set=utf8 -r databasename.mysql -u root databasename
 """
+#TODO: Order output to place DDL first and all INSERTs after; Option to split into two files?
 
 import os, re, sys, time
 
-#TODO: Order output to place DDL first and all INSERTs after; Option to split into two files?
-
-baddt=re.compile(r'(\'0000-\d\d-\d\d\')')  # Invalid MySQL dates
+baddt=re.compile(r'(0000-\d\d-\d\d)')  # Invalid MySQL dates (0000-00-00) which may also appear in timestamps
+#TODO: Danger of replacing non-date strings of the same pattern?
 
 def parse(input_filename, output_filename, rollback):
     "Feed it a file, and it'll output a fixed one"
@@ -92,7 +92,7 @@ def parse(input_filename, output_filename, rollback):
             elif line.startswith("INSERT INTO"):
                 table, values = line.split("VALUES")
                 table = table.split("INSERT INTO")[1].strip().lower()
-                values = baddt.sub("'1900-01-01'", values).strip()  
+                values = baddt.sub('0001-01-01', values).strip()  
                 line = "INSERT INTO %s VALUES %s" % (table, values)
                 output.write(line.encode("utf8", 'replace') + "\n")
                 num_inserts += 1
@@ -198,7 +198,7 @@ def parse(input_filename, output_filename, rollback):
             elif line == ");":
                 output.write("CREATE TABLE \"%s\" (\n" % current_table)
                 for i, line in enumerate(creation_lines):
-                    line = line.replace("DEFAULT '0000-00-00 00:00:00'", "DEFAULT '1900-01-01 00:00:00'")  #TODO - move this hack to its proper location
+                    line = baddt.sub('0001-01-01', line)  # Replace with valid default date values   
                     output.write("    %s%s\n" % (line, "," if i != (len(creation_lines) - 1) else ""))
                 output.write(');\n\n')
                 current_table = None
