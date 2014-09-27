@@ -6,21 +6,21 @@ Fixes a MySQL dump made with the right format so it can be directly imported to 
 Dump using: mysqldump --compatible=postgresql --skip-triggers --default-character-set=utf8 -r databasename.mysql -u root databasename
 """
 
-import re
-import sys
-import os
-import time
+import os, re, sys, time
 
 #TODO: Order output to place DDL first and all INSERTs after; Option to split into two files?
+
+baddt=re.compile(r'(\'0000-\d\d-\d\d\')')  # Invalid MySQL dates
 
 def parse(input_filename, output_filename, rollback):
     "Feed it a file, and it'll output a fixed one"
 
     # State storage
     if input_filename == "-":
-        num_lines = -1
+        num_bytes = -1
     else:
-        num_lines = sum(1 for line in open(input_filename, 'r'))
+        num_bytes = os.path.getsize(input_filename)
+        print num_bytes
     tables = {}
     current_table = None
     creation_lines = []
@@ -55,14 +55,15 @@ def parse(input_filename, output_filename, rollback):
     output.write("SET CLIENT_ENCODING TO 'UTF8';\n")
     output.write("SET CONSTRAINTS ALL DEFERRED;\n\n")
 
+    bytes = 0.0
     for i, line in enumerate(input_fh):
         time_taken = time.time() - started
-        percentage_done = (i+1) / float(num_lines)
+        bytes += len(line)  # assuming line is utf8 encoded from dump options
+        percentage_done = bytes / float(num_bytes)
         secs_left = (time_taken / percentage_done) - time_taken
-        logging.write("\rLine %i (of %s: %.2f%%) [%s tables] [%s inserts] [ETA: %i min %i sec]" % (
+        logging.write("\rLine %i (%.2f%%) [%s tables] [%s inserts] [ETA: %i min %i sec]" % (
             i + 1,
-            num_lines,
-            ((i+1)/float(num_lines))*100,
+            percentage_done * 100,
             len(tables),
             num_inserts,
             secs_left // 60,
@@ -92,7 +93,7 @@ def parse(input_filename, output_filename, rollback):
             elif line.startswith("INSERT INTO"):
                 table, values = line.split("VALUES")
                 table = table.split("INSERT INTO")[1].strip().lower()
-                values = values.replace("'0000-00-00 00:00:00'", "'1900-01-01'").strip()  # Replace invalid MySQL dates
+                values = baddt.sub("'1900-01-01'", values).strip()  
                 line = "INSERT INTO %s VALUES %s" % (table, values)
                 output.write(line.encode("utf8", 'replace') + "\n")
                 num_inserts += 1
@@ -131,6 +132,9 @@ def parse(input_filename, output_filename, rollback):
                     set_sequence = True
                     #final_type = "boolean"
                 elif type.startswith("smallint("):
+                    type = "smallint"
+                    set_sequence = True
+                elif type.startswith("mediumint("):
                     type = "smallint"
                     set_sequence = True
                 elif type.startswith("int("):
