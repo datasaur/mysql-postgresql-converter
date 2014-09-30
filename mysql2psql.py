@@ -9,8 +9,10 @@ Dump using: mysqldump --compatible=postgresql --skip-triggers --default-characte
 
 import os, re, sys, time
 
-baddt=re.compile(r'(0000-\d\d-\d\d)')  # Invalid MySQL dates (0000-00-00) which may also appear in timestamps
+insrt = re.compile(r'INSERT INTO "(\w+)"')
+baddt = re.compile(r'(0000-\d\d-\d\d)')  # Invalid MySQL dates (0000-00-00) which may also appear in timestamps
 #TODO: Danger of replacing non-date strings of the same pattern?
+
 
 def parse(input_filename, output_filename, rollback):
     "Feed it a file, and it'll output a fixed one"
@@ -73,8 +75,8 @@ def parse(input_filename, output_filename, rollback):
         #TODO: Some bytea inserts failing with UTF-8 conversion errors on 0x00 characters
         line = unicode(line, errors='replace').strip().replace(r"\\", "WUBWUBREALSLASHWUB").replace(r"\'", "''").replace("WUBWUBREALSLASHWUB", r"\\")
 
-        # Ignore comment lines
-        if line.startswith("--") or line.startswith("/*") or line.startswith("LOCK TABLES") or line.startswith("UNLOCK TABLES") or not line:
+        # Ignore comment lines, SETs, LOCKs
+        if line.startswith("--") or line.startswith("/*") or line.startswith("SET") or line.startswith("LOCK TABLES") or line.startswith("UNLOCK TABLES") or not line:
             continue
 
         # Outside of anything handling
@@ -90,10 +92,9 @@ def parse(input_filename, output_filename, rollback):
                 creation_lines = []
             # Inserting data into a table?
             elif line.startswith("INSERT INTO"):
-                table, values = line.split("VALUES")
-                table = table.split("INSERT INTO")[1].strip().lower()
+                null, table, values = insrt.split(line)
                 values = baddt.sub('0001-01-01', values).strip()  
-                line = "INSERT INTO %s VALUES %s" % (table, values)
+                line = "INSERT INTO %s %s" % (table, values)
                 output.write(line.encode("utf8", 'replace') + "\n")
                 num_inserts += 1
             else:
