@@ -9,10 +9,13 @@ Dump using: mysqldump --compatible=postgresql --skip-triggers --default-characte
 
 import os, re, sys, time
 
-insrt = re.compile(r'INSERT INTO "(\w+)"')
-baddt = re.compile(r'(0000-\d\d-\d\d)')  # Invalid MySQL dates (0000-00-00) which may also appear in timestamps
+# Invalid MySQL dates (0000-00-00) which may also appear in timestamps
 #TODO: Danger of replacing non-date strings of the same pattern?
+zeroyr = re.compile(r'0000-(\d\d)-(\d\d)')
+zeromm = re.compile(r'(\d\d\d\d)-00-(\d\d)')
+zerodd = re.compile(r'(\d\d\d\d)-(\d\d)-00')
 
+insrt = re.compile(r'INSERT INTO "(\w+)"')  # Split INSERT statement from VALUES clause and cover case when "VALUES" appears in data
 
 def parse(input_filename, output_filename, rollback):
     "Feed it a file, and it'll output a fixed one"
@@ -93,7 +96,8 @@ def parse(input_filename, output_filename, rollback):
             # Inserting data into a table?
             elif line.startswith("INSERT INTO"):
                 null, table, values = insrt.split(line)
-                values = baddt.sub('0001-01-01', values).strip()  
+                values = values.strip()
+                values = zeroyr.sub('0001-01-01', values)
                 line = "INSERT INTO %s %s" % (table, values)
                 output.write(line.encode("utf8", 'replace') + "\n")
                 num_inserts += 1
@@ -130,7 +134,6 @@ def parse(input_filename, output_filename, rollback):
                 if type.startswith("tinyint("):
                     type = "smallint"
                     set_sequence = True
-                    #final_type = "boolean"
                 elif type.startswith("smallint("):
                     type = "smallint"
                     set_sequence = True
@@ -153,8 +156,14 @@ def parse(input_filename, output_filename, rollback):
                     type = "text"
                 elif type == "datetime":
                     type = "timestamp with time zone"
+                elif type.startswith("double("):
+                    type = "numeric"
+                    set_sequence = True
                 elif type == "double":
                     type = "double precision"
+                elif type.startswith("float("):
+                    type = "numeric"
+                    set_sequence = True
                 elif type.endswith("blob"):
                     type = "bytea"
                 elif type.startswith("enum(") or type.startswith("set("):
@@ -199,7 +208,10 @@ def parse(input_filename, output_filename, rollback):
             elif line == ");":
                 output.write("CREATE TABLE \"%s\" (\n" % current_table)
                 for i, line in enumerate(creation_lines):
-                    line = baddt.sub('0001-01-01', line)  # Replace with valid default date values   
+                    # Replace zero date components with valid default date values of 01   
+                    line = zeroyr.sub(r'0001-\1-\2', line)
+                    line = zeromm.sub(r'\1-01-\2', line)
+                    line = zerodd.sub(r'\1-\2-01', line)
                     output.write("    %s%s\n" % (line, "," if i != (len(creation_lines) - 1) else ""))
                 output.write(');\n\n')
                 current_table = None
