@@ -86,7 +86,7 @@ def parse(input_filename, output_filename, rollback):
         if current_table is None:
             if line.startswith("DROP TABLE"):
                 name = line.split('"')[1].lower()
-                line = 'DROP TABLE IF EXISTS "%s";' % name 
+                line = 'DROP TABLE IF EXISTS "%s";' % name
                 output.write(line.encode("utf8", 'replace') + "\n")
             # Start of a table creation statement?
             elif line.startswith("CREATE TABLE"):
@@ -124,7 +124,7 @@ def parse(input_filename, output_filename, rollback):
                 extra = re.sub("COLLATE [\w\d]+\s*", "", extra.replace("unsigned", ""))
 
                 comment = re.search("COMMENT '.+'", extra)
-                if comment: 
+                if comment:
                     column_comments.append(comment.group().replace("COMMENT ", "COMMENT ON COLUMN %s.%s IS " % (current_table, name)))
                     extra = re.sub("COMMENT '.+'", "", extra)
 
@@ -164,6 +164,8 @@ def parse(input_filename, output_filename, rollback):
                 elif type.startswith("float("):
                     type = "numeric"
                     set_sequence = True
+                elif type.startswith("varbinary"):
+                    type = "bytea"
                 elif type.endswith("blob"):
                     type = "bytea"
                 elif type.startswith("enum(") or type.startswith("set("):
@@ -208,7 +210,7 @@ def parse(input_filename, output_filename, rollback):
             elif line == ");":
                 output.write("CREATE TABLE \"%s\" (\n" % current_table)
                 for i, line in enumerate(creation_lines):
-                    # Replace zero date components with valid default date values of 01   
+                    # Replace zero date components with valid default date values of 01
                     line = zeroyr.sub(r'0001-\1-\2', line)
                     line = zeromm.sub(r'\1-01-\2', line)
                     line = zerodd.sub(r'\1-\2-01', line)
@@ -263,6 +265,6 @@ if __name__ == "__main__":
         sys.exit()
 
     rollback = False
-    if len(sys.argv) > 3 and sys.argv[3] == 'rollback': rollback = True 
+    if len(sys.argv) > 3 and sys.argv[3] == 'rollback': rollback = True
 
     parse(sys.argv[1], sys.argv[2], rollback)
